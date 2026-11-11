@@ -1,0 +1,15 @@
+# systemd user service for the browser panel.
+# Install:  mkdir -p ~/.config/systemd/user && cp contrib/herdr-chat-search-panel.service ~/.config/systemd/user/
+#           systemctl --user daemon-reload && systemctl --user enable --now herdr-chat-search-panel.service
+# Adjust ExecStart if the plugin lives elsewhere.
+[Unit]
+Description=Herdr Chat Search panel (127.0.0.1:5132)
+
+[Service]
+ExecStart=%h/dev/herdr-chat-search/target/release/herdr-chat-search serve --port 5132
+Restart=on-failure
+RestartSec=3
+Nice=10
+
+[Install]
+WantedBy=default.target

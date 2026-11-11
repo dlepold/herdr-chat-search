@@ -1,0 +1,9 @@
+# Copy to ~/.config/herdr/plugins/config/herdr-chat-search/config.toml
+#
+# Command that reopens a finished Claude Code session. {id} is replaced by the session id.
+# Default: "claude --resume {id}". Use your own wrapper if you have one, e.g. "cl -r {id}".
+resume_command = "claude --resume {id}"
+
+# Extra Host names the browser panel accepts, e.g. the name of your reverse proxy entry.
+# Default: 127.0.0.1, localhost, chats.localhost. Anything else is answered with 403.
+# extra_hosts = ["chats.example"]

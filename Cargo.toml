@@ -1,0 +1,24 @@
+[package]
+name = "herdr-chat-search"
+version = "0.2.0"
+edition = "2021"
+description = "Full-text search across the chats of all Herdr agents: terminal popup and local browser panel"
+license = "MIT"
+readme = "README.md"
+keywords = ["herdr", "claude-code", "search", "tui", "chat"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+crossterm = "0.29"
+ratatui = "0.30"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tiny_http = "0.12"
+toml = "0.8"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+codegen-units = 1

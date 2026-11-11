@@ -1,0 +1,32 @@
+# herdr plugin: Chat Search
+# Full-text search across the chat transcripts of every Herdr agent (Claude Code sessions).
+#
+# Terminal popup (Herdr):  Ctrl+B then / (bound in ~/.config/herdr/config.toml, see README)
+# Browser panel (optional): herdr-chat-search serve   ->  http://127.0.0.1:5132
+#
+# Local dev:  herdr plugin link <this folder>
+# Logs:       herdr plugin log list --plugin herdr-chat-search
+
+id = "herdr-chat-search"
+name = "Chat Search"
+version = "0.2.0"
+min_herdr_version = "0.9.0"
+description = "Search the chat content of all Herdr agents by keyword, jump to the matching agent, optionally include closed sessions. Rust terminal popup plus an optional local browser panel."
+platforms = ["linux"]
+
+[[build]]
+command = ["cargo", "build", "--release"]
+
+[[actions]]
+id = "open"
+title = "Chat Search: open"
+contexts = ["workspace", "global"]
+command = ["herdr", "plugin", "pane", "open", "--plugin", "herdr-chat-search", "--entrypoint", "search"]
+
+[[panes]]
+id = "search"
+title = "Chat Search"
+command = ["./target/release/herdr-chat-search", "ui"]
+placement = "popup"
+width = "85%"
+height = "85%"
