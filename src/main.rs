@@ -5,6 +5,7 @@
 //   herdr-chat-search serve      local browser panel (default http://127.0.0.1:5132)
 //   herdr-chat-search index      build or refresh the search index
 //   herdr-chat-search list       print search results as plain text (scripting)
+//   herdr-chat-search selftest   index and search a tiny fake session (used by the release build)
 
 mod core;
 mod panel;
@@ -92,10 +93,53 @@ fn main() {
                 println!("{}\t{}\t{}\t{}\t{}\t{}", r.s.sid, st, r.s.title, r.s.ws, r.n, sn);
             }
         }
+        "-V" | "--version" | "version" => println!("herdr-chat-search {}", env!("CARGO_PKG_VERSION")),
+        "selftest" => match selftest() {
+            Ok(()) => println!("selftest ok"),
+            Err(e) => {
+                eprintln!("selftest failed: {e}");
+                std::process::exit(1);
+            }
+        },
         "-h" | "--help" | "help" => usage(),
         _ => {
             usage();
             std::process::exit(2);
         }
     }
+}
+
+/// Builds a fake Claude session in a temp folder, then indexes and searches it. The release
+/// workflow runs this on every target CPU, so a binary that cannot do its core job never ships.
+fn selftest() -> Result<(), String> {
+    use std::fs;
+    let dir = std::env::temp_dir().join(format!("herdr-chat-search-selftest-{}", std::process::id()));
+    let proj = dir.join("claude/projects/-tmp-demo");
+    fs::create_dir_all(&proj).map_err(|e| e.to_string())?;
+    let sid = "11111111-2222-3333-4444-555555555555";
+    let lines = [
+        r#"{"parentUuid":null,"type":"user","message":{"role":"user","content":"Hello <system-reminder>hidden noise</system-reminder> Marzipan question"},"timestamp":"2026-01-01T10:00:00.000Z","cwd":"/tmp/demo"}"#,
+        r#"{"parentUuid":"a","message":{"role":"assistant","content":[{"type":"text","text":"An answer about marzipan"},{"type":"tool_use","name":"Bash"}]},"type":"assistant","timestamp":"2026-01-01T10:00:05.000Z"}"#,
+        r#"{"type":"ai-title","aiTitle":"Demo title","sessionId":"11111111-2222-3333-4444-555555555555"}"#,
+    ];
+    fs::write(proj.join(format!("{sid}.jsonl")), lines.join("\n") + "\n").map_err(|e| e.to_string())?;
+    std::env::set_var("CLAUDE_CONFIG_DIR", dir.join("claude"));
+    std::env::set_var("XDG_CACHE_HOME", dir.join("cache"));
+    std::env::set_var("HERDR_BIN_PATH", "/nonexistent/herdr");
+    let result = (|| {
+        let hit = core::search("MARZIPAN question", 7);
+        if hit.len() != 1 || hit[0].n != 1 || hit[0].s.title != "Demo title" || hit[0].s.cwd != "/tmp/demo" {
+            return Err(format!("expected 1 session with 1 hit, got {} rows", hit.len()));
+        }
+        let both = core::search("marzipan", 7);
+        if both.len() != 1 || both[0].n != 2 {
+            return Err("expected 2 matching messages for 'marzipan'".into());
+        }
+        if !core::search("hidden noise", 7).is_empty() {
+            return Err("system-reminder text must not be searchable".into());
+        }
+        Ok(())
+    })();
+    let _ = fs::remove_dir_all(&dir);
+    result
 }

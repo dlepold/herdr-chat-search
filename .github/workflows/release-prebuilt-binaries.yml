@@ -1,0 +1,95 @@
+# Builds the static Linux binaries (x86_64 and aarch64, musl) for a release tag (vX.Y.Z) and
+# attaches them, with SHA256SUMS and build-provenance attestations, to the GitHub release.
+# scripts/fetch-or-build-binary.sh downloads exactly these files on `herdr plugin install`.
+# Adapted 2026-11-11 from the workflow of dlepold/herdr-agent-resource-badges (no macOS: the
+# browser panel opens terminals with tilix or gnome-terminal).
+
+name: release prebuilt binaries
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-24.04
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag must match the manifest and Cargo versions
+        run: |
+          v=$(sed -n 's/^version = "\([^"]*\)"$/\1/p' herdr-plugin.toml | head -n 1)
+          c=$(sed -n 's/^version = "\([^"]*\)"$/\1/p' Cargo.toml | head -n 1)
+          echo "tag=$GITHUB_REF_NAME manifest=$v cargo=$c"
+          test "v$v" = "$GITHUB_REF_NAME"
+          test "$v" = "$c"
+
+      - name: Rust toolchain
+        run: |
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Test and build
+        run: |
+          rustup target add ${{ matrix.target }}
+          cargo test --locked
+          cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Smoke test on the target CPU
+        run: |
+          bin=./target/${{ matrix.target }}/release/herdr-chat-search
+          out=$($bin --version)
+          echo "$out"
+          test "$out" = "herdr-chat-search ${GITHUB_REF_NAME#v}"
+          $bin selftest
+          file $bin
+          cp $bin herdr-chat-search-${{ matrix.target }}
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: herdr-chat-search-${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: herdr-chat-search-${{ matrix.target }}
+          path: herdr-chat-search-${{ matrix.target }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum herdr-chat-search-* > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" dist/* -R "$GITHUB_REPOSITORY" --clobber

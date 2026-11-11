@@ -13,8 +13,12 @@ Created 2026-11-07, rewritten in Rust 2026-11-08. Linux only for now.
 ## Install
 
 ```bash
-herdr plugin link /path/to/herdr-chat-search      # builds with cargo on first use
+herdr plugin install dlepold/herdr-chat-search
 ```
+
+On x86_64 and aarch64 Linux this downloads a prebuilt static binary from the GitHub release and verifies its
+SHA-256 checksum, so you do not need Rust. Without network, on other CPUs, or with `HERDR_CHAT_SEARCH_FROM_SOURCE=1`
+it builds from source with `cargo build --release --locked`. For development: `cargo build --release && herdr plugin link .`
 
 Bind a key in `~/.config/herdr/config.toml` (the popup is also in the command palette as "Chat Search: open"):
 
@@ -80,7 +84,9 @@ headers (cross-site requests), requires JSON for `POST`, and validates session i
 
 | Path | Role |
 |---|---|
-| `herdr-plugin.toml` | plugin manifest: popup pane `search`, action `open`, cargo build |
+| `herdr-plugin.toml` | plugin manifest: popup pane `search`, action `open`, build step |
+| `scripts/fetch-or-build-binary.sh` | install step: download and verify the prebuilt binary, else `cargo build` |
+| `.github/workflows/` | `ci.yml` (build, test, clippy), `release-prebuilt-binaries.yml` (static binaries on a `v*` tag) |
 | `src/core.rs` | sessions, incremental index, search, actions |
 | `src/tui.rs` | terminal UI (ratatui), searches in a worker thread |
 | `src/panel.rs`, `src/panel.html` | local HTTP server and the single-page UI |

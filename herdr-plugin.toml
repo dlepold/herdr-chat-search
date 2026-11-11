@@ -4,7 +4,8 @@
 # Terminal popup (Herdr):  Ctrl+B then / (bound in ~/.config/herdr/config.toml, see README)
 # Browser panel (optional): herdr-chat-search serve   ->  http://127.0.0.1:5132
 #
-# Local dev:  herdr plugin link <this folder>
+# Install:    herdr plugin install dlepold/herdr-chat-search
+# Local dev:  cargo build --release && herdr plugin link .
 # Logs:       herdr plugin log list --plugin herdr-chat-search
 
 id = "herdr-chat-search"
@@ -14,8 +15,11 @@ min_herdr_version = "0.9.0"
 description = "Search the chat content of all Herdr agents by keyword, jump to the matching agent, optionally include closed sessions. Rust terminal popup plus an optional local browser panel."
 platforms = ["linux"]
 
+# No Rust needed on x86_64/aarch64 Linux: the script downloads this version's prebuilt static binary
+# from GitHub Releases and verifies it against the release's SHA256SUMS. Without network, on other
+# CPUs, or with HERDR_CHAT_SEARCH_FROM_SOURCE=1 it runs `cargo build --release --locked`.
 [[build]]
-command = ["cargo", "build", "--release"]
+command = ["sh", "scripts/fetch-or-build-binary.sh"]
 
 [[actions]]
 id = "open"
